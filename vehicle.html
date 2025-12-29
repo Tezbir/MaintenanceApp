@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>VeeCare • Vehicle</title>
+  <link rel="stylesheet" href="assets/app.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <div style="width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,#4f8cff,#3ddc97);"></div>
+        <div>VeeCare <span class="badge">vehicle</span></div>
+      </div>
+      <div class="row" style="justify-content:flex-end; align-items:center; gap:10px;">
+        <a class="btn" href="dashboard.html">← Back</a>
+        <button class="btn" onclick="logout()">Log out</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="hd">
+          <div class="h2" id="vehTitle">Vehicle</div>
+          <p class="p" id="vehSub">—</p>
+        </div>
+        <div class="bd">
+          <div class="row">
+            <div>
+              <label class="label">Nickname</label>
+              <input id="eName" class="input" />
+            </div>
+            <div>
+              <label class="label">Mileage</label>
+              <input id="eMileage" class="input" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label class="label">Year</label>
+              <input id="eYear" class="input" />
+            </div>
+            <div>
+              <label class="label">Make</label>
+              <input id="eMake" class="input" />
+            </div>
+            <div>
+              <label class="label">Model</label>
+              <input id="eModel" class="input" />
+            </div>
+          </div>
+
+          <label class="label">VIN</label>
+          <input id="eVin" class="input" disabled />
+
+          <div class="actions">
+            <button id="btnSaveVeh" class="btn good">Save Vehicle</button>
+          </div>
+
+          <div style="height:12px"></div>
+          <div class="kpi" id="dueKpi"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">
+          <div class="h2">Add Service Record</div>
+          <p class="p">Maps to <b>service_record</b> (vee_id, service_type_id, date, mileage, cost, notes).</p>
+        </div>
+        <div class="bd">
+          <label class="label">Service Type</label>
+          <select id="rType" class="select"></select>
+
+          <div class="row">
+            <div>
+              <label class="label">Date</label>
+              <input id="rDate" class="input" type="date" />
+            </div>
+            <div>
+              <label class="label">Mileage</label>
+              <input id="rMiles" class="input" placeholder="65000" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label class="label">Cost</label>
+              <input id="rCost" class="input" placeholder="79.99" />
+            </div>
+            <div>
+              <label class="label">Quick Note</label>
+              <input id="rQuick" class="input" placeholder="Full synthetic" />
+            </div>
+          </div>
+
+          <label class="label">Notes</label>
+          <textarea id="rNotes" class="textarea" placeholder="Any details..."></textarea>
+
+          <div class="actions">
+            <button id="btnAddRec" class="btn primary">Add Record</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:18px"></div>
+
+    <div class="card">
+      <div class="hd">
+        <div class="h2">Service History</div>
+        <p class="p">Newest first (matches your idx_record_vee_date / mileage sorting patterns).</p>
+      </div>
+      <div class="bd">
+        <table class="table" id="recTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Mileage</th>
+              <th>Cost</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="footer">VeeCare • vehicle</div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    requireAuth();
+
+    const params = new URLSearchParams(window.location.search);
+    const vee_id = Number(params.get("vee_id"));
+    const vehicles = demo.getVehicles();
+    const vee = vehicles.find(v => v.vee_id === vee_id);
+
+    if(!vee){
+      toast("Vehicle not found", "bad");
+      window.location.href = "dashboard.html";
+    }
+
+    const serviceTypes = demo.getServiceTypes();
+
+    function loadTypeOptions(){
+      $("#rType").innerHTML = serviceTypes.map(st =>
+        `<option value="${st.service_type_id}">${st.service_type_name}</option>`
+      ).join("");
+    }
+
+    function renderVehicle(){
+      const display = `${vee.vee_year || "—"} ${vee.vee_make || ""} ${vee.vee_model || ""}`.trim();
+      $("#vehTitle").textContent = vee.vee_name || "Vehicle";
+      $("#vehSub").textContent = display || "—";
+
+      $("#eName").value = vee.vee_name || "";
+      $("#eMileage").value = vee.vee_mileage ?? 0;
+      $("#eYear").value = vee.vee_year || "";
+      $("#eMake").value = vee.vee_make || "";
+      $("#eModel").value = vee.vee_model || "";
+      $("#eVin").value = vee.vee_vin || "";
+    }
+
+    function renderDue(){
+      const records = listRecordsForVehicle(vee_id);
+      const due = computeDue(vee, records, serviceTypes);
+
+      const kpi = $("#dueKpi");
+      kpi.innerHTML = "";
+
+      const box1 = document.createElement("div");
+      box1.className = "box";
+      box1.innerHTML = `<div class="big">${(vee.vee_mileage ?? 0).toLocaleString()}</div><div class="small">Current mileage</div>`;
+      kpi.appendChild(box1);
+
+      const box2 = document.createElement("div");
+      box2.className = "box";
+      box2.innerHTML = `<div class="big">${records.length}</div><div class="small">Total records</div>`;
+      kpi.appendChild(box2);
+
+      const box3 = document.createElement("div");
+      box3.className = "box";
+      box3.innerHTML = `<div class="big">${due.overdueCount}</div><div class="small">Overdue services</div>`;
+      kpi.appendChild(box3);
+    }
+
+    function renderRecords(){
+      const records = listRecordsForVehicle(vee_id);
+      const tbody = $("#recTable tbody");
+      tbody.innerHTML = "";
+
+      if(records.length === 0){
+        tbody.innerHTML = `<tr><td colspan="6" style="color:rgba(255,255,255,.5)">No service records yet. Add one above.</td></tr>`;
+        return;
+      }
+
+      const typeMap = Object.fromEntries(serviceTypes.map(st => [st.service_type_id, st.service_type_name]));
+
+      records.forEach(r=>{
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${fmtDate(r.service_record_date)}</td>
+          <td>${typeMap[r.service_type_id] || ("Type #" + r.service_type_id)}</td>
+          <td>${Number(r.service_record_mileage).toLocaleString()}</td>
+          <td>${fmtMoney(r.service_record_cost)}</td>
+          <td style="color:rgba(255,255,255,.65)">${(r.service_record_notes || r.quick_note || "").slice(0,120) || "—"}</td>
+          <td style="text-align:right">
+            <button class="btn danger" data-del="${r.service_record_id}">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      $$("[data-del]").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const id = Number(btn.getAttribute("data-del"));
+          deleteRecord(id);
+          toast("Record deleted");
+          renderRecords();
+          renderDue();
+        });
+      });
+    }
+
+    $("#btnSaveVeh").addEventListener("click", ()=>{
+      const vee_name = $("#eName").value.trim();
+      const vee_mileage = Number($("#eMileage").value.trim() || 0);
+      const vee_year = Number($("#eYear").value.trim() || 0) || null;
+      const vee_make = $("#eMake").value.trim();
+      const vee_model = $("#eModel").value.trim();
+
+      if(Number.isNaN(vee_mileage) || vee_mileage < 0) return toast("Mileage must be positive", "bad");
+
+      updateVehicle(vee_id, { vee_name, vee_mileage, vee_year, vee_make, vee_model });
+      Object.assign(vee, { vee_name, vee_mileage, vee_year, vee_make, vee_model });
+
+      toast("Vehicle saved");
+      renderVehicle();
+      renderDue();
+    });
+
+    $("#btnAddRec").addEventListener("click", ()=>{
+      const service_type_id = Number($("#rType").value);
+      const service_record_date = $("#rDate").value;
+      const service_record_mileage = Number($("#rMiles").value.trim() || 0);
+      const service_record_cost = $("#rCost").value.trim() ? Number($("#rCost").value.trim()) : null;
+      const quick = $("#rQuick").value.trim();
+      const notes = $("#rNotes").value.trim();
+
+      if(!service_record_date) return toast("Pick a date", "bad");
+      if(Number.isNaN(service_record_mileage) || service_record_mileage <= 0) return toast("Mileage must be a number", "bad");
+      if(service_record_cost != null && Number.isNaN(service_record_cost)) return toast("Cost must be a number", "bad");
+
+      addRecord({
+        vee_id,
+        service_type_id,
+        service_record_date,
+        service_record_mileage,
+        service_record_cost,
+        service_record_notes: notes || quick || null
+      });
+
+      $("#rDate").value = "";
+      $("#rMiles").value = "";
+      $("#rCost").value = "";
+      $("#rQuick").value = "";
+      $("#rNotes").value = "";
+
+      toast("Service record added");
+      renderRecords();
+      renderDue();
+    });
+
+    loadTypeOptions();
+    renderVehicle();
+    renderDue();
+    renderRecords();
+  </script>
+</body>
+</html>

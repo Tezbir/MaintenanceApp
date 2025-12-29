@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>VeeCare • Garage</title>
+  <link rel="stylesheet" href="assets/app.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <div style="width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,#4f8cff,#3ddc97);"></div>
+        <div>VeeCare <span class="badge">garage</span></div>
+      </div>
+      <div class="row" style="justify-content:flex-end; align-items:center; gap:10px;">
+        <span id="who" class="chip dot"></span>
+        <button class="btn" onclick="logout()">Log out</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="hd">
+          <div class="h2">Your Vehicles (vee)</div>
+          <p class="p">Add cars and track mileage. Click a vehicle to view records.</p>
+        </div>
+        <div class="bd">
+          <table class="table" id="vehTable">
+            <thead>
+              <tr>
+                <th>Vehicle</th>
+                <th>VIN</th>
+                <th>Mileage</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div style="height:10px"></div>
+          <div class="notice">Tip: The vehicles map to your DB table <b>vee</b> (vee_name, year, make, model, vin, mileage).</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">
+          <div class="h2">Add Vehicle</div>
+          <p class="p">This writes to the vee table (user_id, vin unique per user).</p>
+        </div>
+        <div class="bd">
+          <label class="label">Nickname (vee_name)</label>
+          <input id="vName" class="input" placeholder="My Civic" />
+
+          <div class="row">
+            <div>
+              <label class="label">Year</label>
+              <input id="vYear" class="input" placeholder="2018" />
+            </div>
+            <div>
+              <label class="label">Make</label>
+              <input id="vMake" class="input" placeholder="Honda" />
+            </div>
+          </div>
+
+          <label class="label">Model</label>
+          <input id="vModel" class="input" placeholder="Civic" />
+
+          <label class="label">VIN (17 chars)</label>
+          <input id="vVin" class="input" placeholder="1HGCM82633A123456" maxlength="17" />
+
+          <label class="label">Current Mileage</label>
+          <input id="vMileage" class="input" placeholder="65000" />
+
+          <div class="actions">
+            <button id="btnAdd" class="btn good">Add Vehicle</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">VeeCare • dashboard</div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    const user = requireAuth();
+    if(user) $("#who").textContent = user.user_email;
+
+    function renderVehicles(){
+      const tbody = $("#vehTable tbody");
+      tbody.innerHTML = "";
+      const vehicles = listVehicles();
+      if(vehicles.length === 0){
+        tbody.innerHTML = `<tr><td colspan="4" style="color:rgba(255,255,255,.5)">No vehicles yet. Add one on the right.</td></tr>`;
+        return;
+      }
+      vehicles.forEach(v=>{
+        const display = `${v.vee_year || "—"} ${v.vee_make || ""} ${v.vee_model || ""}`.trim();
+        const name = v.vee_name ? `<div style="font-weight:900">${v.vee_name}</div>` : "";
+        const main = `<div>${display || "Vehicle"}</div>`;
+        const vin = v.vee_vin ? v.vee_vin : "—";
+        const miles = (v.vee_mileage ?? 0).toLocaleString();
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>
+            ${name}
+            <div style="color:rgba(255,255,255,.55); font-size:12px; margin-top:3px">${main}</div>
+          </td>
+          <td style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas; font-size:12px">${vin}</td>
+          <td>${miles}</td>
+          <td style="text-align:right">
+            <button class="btn primary" data-open="${v.vee_id}">Open</button>
+            <button class="btn danger" data-del="${v.vee_id}">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      $$("[data-open]").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const id = Number(btn.getAttribute("data-open"));
+          window.location.href = `vehicle.html?vee_id=${id}`;
+        });
+      });
+      $$("[data-del]").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const id = Number(btn.getAttribute("data-del"));
+          deleteVehicle(id);
+          toast("Vehicle deleted");
+          renderVehicles();
+        });
+      });
+    }
+
+    $("#btnAdd").addEventListener("click", ()=>{
+      const vee_name = $("#vName").value.trim();
+      const vee_year = Number($("#vYear").value.trim() || 0) || null;
+      const vee_make = $("#vMake").value.trim();
+      const vee_model = $("#vModel").value.trim();
+      const vee_vin = $("#vVin").value.trim().toUpperCase();
+      const vee_mileage = Number($("#vMileage").value.trim() || 0);
+
+      if(!vee_vin || vee_vin.length !== 17) return toast("VIN must be 17 characters", "bad");
+      if(Number.isNaN(vee_mileage) || vee_mileage < 0) return toast("Mileage must be a positive number", "bad");
+
+      // enforce unique (user_id, vin) like your uq_user_vin
+      const exists = demo.getVehicles().some(v => v.vee_vin === vee_vin);
+      if(exists) return toast("That VIN already exists for this user", "bad");
+
+      addVehicle({
+        user_id: user.user_id,
+        vee_name, vee_year, vee_make, vee_model, vee_vin,
+        vee_mileage
+      });
+
+      $("#vName").value = "";
+      $("#vYear").value = "";
+      $("#vMake").value = "";
+      $("#vModel").value = "";
+      $("#vVin").value = "";
+      $("#vMileage").value = "";
+
+      toast("Vehicle added");
+      renderVehicles();
+    });
+
+    renderVehicles();
+  </script>
+</body>
+</html>
