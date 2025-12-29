@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>VeeCare • Sign in</title>
+  <link rel="stylesheet" href="assets/app.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <div style="width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,#4f8cff,#3ddc97);"></div>
+        <div>VeeCare <span class="badge">car maintenance</span></div>
+      </div>
+      <a class="chip" href="#" onclick="window.alert('Template UI • wire this to your backend')">Frontend Template</a>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="hd">
+          <div class="h1">Keep your car on schedule.</div>
+          <p class="p">Track vehicles (vee), log service records, and see what’s due based on miles/days.</p>
+        </div>
+        <div class="bd">
+          <div class="kpi">
+            <div class="box">
+              <div class="big">Vehicles</div>
+              <div class="small">Saved per user_id</div>
+            </div>
+            <div class="box">
+              <div class="big">Service Types</div>
+              <div class="small">Oil, tires, brakes…</div>
+            </div>
+            <div class="box">
+              <div class="big">Service Records</div>
+              <div class="small">Date, mileage, cost, notes</div>
+            </div>
+          </div>
+
+          <div style="margin-top:14px" class="notice">
+            Demo mode is ON (localStorage). When your backend is ready, switch <b>DEMO_MODE</b> to false in <b>assets/app.js</b>.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">
+          <div class="h2">Sign in</div>
+          <p class="p">Use your email + password.</p>
+        </div>
+        <div class="bd">
+          <label class="label">Email</label>
+          <input id="loginEmail" class="input" placeholder="you@email.com" />
+          <label class="label">Password</label>
+          <input id="loginPass" class="input" type="password" placeholder="••••••••" />
+
+          <div class="actions">
+            <button id="btnLogin" class="btn primary">Sign in</button>
+            <button id="btnDemo" class="btn">Use demo account</button>
+          </div>
+
+          <hr style="border:0;border-top:1px solid rgba(255,255,255,.08); margin:18px 0;">
+
+          <div class="h2">Create account</div>
+          <label class="label">Name</label>
+          <input id="regName" class="input" placeholder="Tezbir" />
+          <label class="label">Email</label>
+          <input id="regEmail" class="input" placeholder="tezbir@email.com" />
+          <label class="label">Password</label>
+          <input id="regPass" class="input" type="password" placeholder="8–18 chars" />
+
+          <div class="actions">
+            <button id="btnRegister" class="btn good">Sign up</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">© <span id="year"></span> VeeCare • template</div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    $("#year").textContent = new Date().getFullYear();
+
+    $("#btnDemo").addEventListener("click", async ()=>{
+      try{
+        await apiLogin("demo@veecare.app", "password");
+        window.location.href = "dashboard.html";
+      }catch(e){ toast(e.message, "bad"); }
+    });
+
+    $("#btnLogin").addEventListener("click", async ()=>{
+      try{
+        const email = $("#loginEmail").value.trim();
+        const pass = $("#loginPass").value.trim();
+        if(!email || !pass) return toast("Enter email + password", "bad");
+        await apiLogin(email, pass);
+        window.location.href = "dashboard.html";
+      }catch(e){ toast(e.message, "bad"); }
+    });
+
+    $("#btnRegister").addEventListener("click", async ()=>{
+      try{
+        const name = $("#regName").value.trim();
+        const email = $("#regEmail").value.trim();
+        const pass = $("#regPass").value.trim();
+        if(!email || !pass) return toast("Email + password required", "bad");
+        await apiRegister(name, email, pass);
+        window.location.href = "dashboard.html";
+      }catch(e){ toast(e.message, "bad"); }
+    });
+  </script>
+</body>
+</html>
